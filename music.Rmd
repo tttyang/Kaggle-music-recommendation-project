@@ -1,0 +1,575 @@
+---
+gtitle: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+```{r}
+getwd()
+```
+
+```{r train}
+library(modelr)
+library(tidyverse)
+song_extra<-read_csv("/Users/yzh/Desktop/R data/music/kkbox/song_extra_info.csv")
+song<-read_csv("/Users/yzh/Desktop/R data/music/kkbox/songs.csv")
+train<-read_csv("/Users/yzh/Desktop/R data/music/kkbox/train.csv")
+members<-read_csv("/Users/yzh/Desktop/R data/music/kkbox/members.csv")
+train_song<-left_join(train, song,by="song_id")
+train_song_member<-left_join(train_song,members,by="msno")
+
+```
+
+```{r merge extra song data}
+train_song_member<-left_join(train_song_member,song_extra,by="song_id")
+```
+
+
+
+
+```{r}
+View(summarize_all( test_song_member,funs( non_na_proportion=sum( !is.na(.) )/n() ) )) 
+View(summarize_all( test_song_member,funs( non_na=sum( !is.na(.)  ) ))) #test non-na count
+```
+
+
+source_system_tab+ source_screen_name+ source_type
+```{r may_remove_some_na}
+train_song_member<-mutate(train_song_member, composer=ifelse(is.na(composer)==T,"nacool",composer),
+source_system_tab=ifelse(is.na(source_system_tab)==T,"na_system",source_system_tab),
+source_screen_name=ifelse(is.na(source_screen_name)==T,"na_screen",source_screen_name),
+source_type=ifelse(is.na(source_type)==T,"na_type",source_type)
+)
+```
+
+```{r}
+dif_artist<-setdiff(as_tibble(test_song_member$artist_name),as_tibble(train_song_member$artist_name))      # those in test_song_member but not in train_song_member(including NA)
+n_distinct(test_song_member$artist_name)
+
+dif_songid<-setdiff(as_tibble(test_song_member$song_id),as_tibble(train_song_member$song_id))
+n_distinct(test_song_member$song_id)
+
+dif_msno<-setdiff(as_tibble(test_song_member$msno),as_tibble(train_song_member$msno))
+n_distinct(test_song_member$msno)
+```
+
+```{r test}
+library(modelr)
+library(tidyverse)
+test<-read_csv("/Users/yzh/Desktop/R data/music/kkbox/test.csv")
+test_song<-left_join(test, song,by="song_id")
+test_song_member<-left_join(test_song,members,by="msno")
+rm(test_song)
+```
+
+
+
+```{r non_na_proportion}
+non_na <- summarize_all( train_song_member,funs( non_na_proportion=sum( !is.na(.) )/n() ) )
+View(non_na)
+```
+
+# ??
+```{r non_na_count}
+non_na_count <- summarize_all( train_song_member,funs( non_na=sum( !is.na(.)  ) )) 
+View(non_na_count)
+```
+```{r}
+View(summarize_all( test_song_member,funs( non_na=sum( !is.na(.)  ) )) )
+```
+
+```{r artist_heat}
+heat<-arrange(summarize(group_by(train_song_member,artist_name),play_ratio=n()/nrow(train_song_member) ), desc(play_ratio))
+View(heat)
+test_heat<-arrange(summarize(group_by(test_song_member,artist_name),play_ratio=n()/nrow(train_song_member) ), desc(play_ratio))
+```
+
+
+
+----------
+#pick some artists here
+```{r artist_influence}  
+artist_influence<-train_song_member %>% group_by(artist_name) %>% summarize(repeat_ratio=mean(target,na.rm=T),ratio=n()/nrow(train_song_member)) %>% 
+       arrange(desc(ratio))
+
+hot_influ_arti<-filter(artist_influence[1:350,],repeat_ratio>=0.6|repeat_ratio<=0.4)
+sum(artist_influence[1:350,3])  
+sum(hot_influ_arti[,3])   # population ratio
+
+nrow(hot_influ_arti)   # category(artist) number max 52?
+```
+----------
+#pick some composers here
+```{r compo_influence} 
+compo_influ<-train_song_member %>% group_by(composer) %>% summarize(repeat_ratio=mean(target,na.rm=T),ratio=n()/nrow(train_song_member)) %>% 
+       arrange(desc(ratio))  #valuable NA?
+
+hot_influ_compo<-filter(compo_influ[1:300,],repeat_ratio>=0.63|repeat_ratio<=0.37)
+sum(compo_influ[1:300,3])  
+sum(hot_influ_compo[,3])   # population ratio
+
+nrow(hot_influ_compo)   # category(artist) number  max 51?
+```
+
+
+```{r genre_sort}
+genre_ratio<-arrange(summarize(group_by(train_song_member,genre_ids),ratio=n()/nrow(train_song_member) ), desc(ratio))
+View(genre_ratio)
+```
+
+
+#pick some genres here
+```{r genre_influence}
+genre_influence<-train_song_member %>% group_by(genre_ids) %>% summarize(repeat_ratio=mean(target,na.rm=T),ratio=n()/nrow(train_song_member)) %>% 
+       arrange(desc(ratio))
+
+hot_influ_genre<-filter(genre_influence[1:25,]) #may use repeat_ratio>=0.51|repeat_ratio<=0.49
+sum(genre_influence[1:25,3])
+sum(hot_influ_genre[,3])   # population ratio
+
+nrow(hot_influ_genre)   # category(artist) number
+```
+
+```{r}
+source_system_tab_ratio<-arrange(summarize(group_by(train_song_member,source_system_tab),ratio=n()/nrow(train_song_member) ), desc(ratio))
+
+View(source_system_tab_ratio)
+```
+
+```{r logit}
+set.seed(1)
+sample<-resample_partition(train_song_member, c(x=0.001,y=0.999))
+samplex<-as_tibble(sample$x)
+logit<-glm(target ~artist_name, family=binomial(link="logit"), data=samplex)
+```
+
+```{r}
+logit<-glm(target ~artist_name, family=binomial(link="logit"), train_song_member)
+```
+
+```{r not sample}
+sample2<-train_song_member
+```
+
+```{r sample} 
+set.seed(2) #sample for fearture analysis
+sample2<-as_tibble(resample_partition(train_song_member, c(x=1,y=0)) $ x)
+```
+
+```{r}
+summarize(group_by(train_song_member,target),target_num=n())
+```
+
+
+
+source_system_tab: the name of the tab where the event was triggered. System tabs are used to categorize KKBOX mobile apps functions. For example, tab my library contains functions to manipulate the local storage, and tab search contains functions relating to search.
+----
+source_screen_name: name of the layout a user sees.
+
+```{r 3source}
+ggplot(data=sample2)+geom_bar(aes(x=source_system_tab,fill=as.character(target)))+theme(axis.text.x = element_text(angle = 45, hjust = 1)) #coclusion: source_system_tab apprarent influenceon target
+
+ggplot(data=sample2)+geom_bar(aes(x=source_screen_name,fill=as.character(target)))+theme(axis.text.x = element_text(angle = 45, hjust = 1))#coclusion:source_screen)name has apprarent influenceon target
+
+ggplot(data=sample2)+geom_bar(aes(x=source_type,fill=as.character(target)))+theme(axis.text.x = element_text(angle = 45, hjust = 1))#coclusion:source_type has apprarent influenceon target
+```
+
+```{r gender&bd}
+ggplot(data=sample2)+geom_bar(aes(x=gender,fill=as.character(target)))+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(data=sample2)+geom_bar(aes(x=as.character(bd),fill=as.character(target)))+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r language&city}
+ggplot(data=sample2)+geom_bar(aes(x=as.character(language),fill=as.character(target)))+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(data=sample2)+geom_bar(aes(x=as.character(city),fill=as.character(target)))+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r influence_compare}
+bd_influ<-train_song_member %>% group_by(bd) %>% summarize(repeat_ratio=mean(target,na.rm=T),ratio=n()/nrow(train_song_member)) %>% 
+       arrange(desc(ratio))
+var(bd_influ$repeat_ratio,na.rm=T)
+songid_influence<-train_song_member %>% group_by(song_id) %>% summarize(repeat_ratio=mean(target,na.rm=T),ratio=n()/nrow(train_song_member)) %>% 
+       arrange(desc(ratio))
+var(songid_influence$repeat_ratio,na.rm=T)#repeat_ratio variance compare 
+# bd:0.0281  songid:0.14492 msno:0.07  source_system_tab:0.0144 source_screen_name: 0.01420285
+#source_type:0.0154 gender:0.0001265031 language:0.002491246 city:0.0007068816
+#genre_ids:0.06006204 artist_name: 0.1100381 composer:0.1208553 lyricist:0.1079859
+# registered_via 0.0005485893  also, for song_extra: name:0.1327779  isrc:0.1432133
+#msno&artist_name: 0.2118191   msno&genre_ids: 0.1578223 
+```
+
+```{r song_length&registration_init_time&expiration_date}
+ggplot(data=sample2)+geom_boxplot(aes(x=as.factor(target),y=song_length))
+ggplot(data=sample2)+geom_boxplot(aes(x=as.factor(target),y=registration_init_time))
+ggplot(data=sample2)+geom_boxplot(aes(x=as.factor(target),y=expiration_date))
+ggplot(data=sample2)+geom_boxplot(aes(x=as.factor(target),y=bd))
+#these three has no influence on target, according to boxplot
+```
+
+
+#turn other artitists , genres ,composers.. into "other" 
+```{r finaltrain} 
+smalltbl<-transmute(
+  train_song_member,source_system_tab, source_screen_name, city=as.character(city), language=as.character(language), source_type,target,          artist_name = as.character( factor(artist_name, levels=levels(as.factor(hot_influ_arti$artist_name)) ) ),          genre_ids=as.character( factor(genre_ids, levels=levels(as.factor(hot_influ_genre$genre_ids) ) ) ),
+          composer=as.character( factor(composer, levels=levels(as.factor(hot_influ_compo$composer) ) ) )
+          )
+
+smalltbl<-transmute(smalltbl,source_system_tab, source_screen_name, source_type, target, city, language, artist_name=ifelse(is.na(artist_name)==T,"other_yep",artist_name), genre_ids=ifelse(is.na(genre_ids)==T,"yep_other",genre_ids),
+composer=  ifelse(is.na(composer)==T,"other_compo",composer)                  )
+```
+
+```{r}
+View(filter(smalltbl, artist_name=="other_yep" & genre_ids=="yep_other"))
+```
+
+```{r}
+set.seed(5)
+partx<-resample_partition(smalltbl,c(train=0.1,test=0.0001,k=1-0.001-0.0001)) 
+# train 0.01:may slow
+traini<-as_tibble(partx$train)
+testi<-mutate(as_tibble(partx$test),
+artist_name=as.character(factor(artist_name,levels=levels(factor(traini$artist_name)) )), 
+composer=as.character(factor(composer,levels=levels(factor(traini$composer)) )),              
+genre_ids=as.character(factor(genre_ids,levels=levels(factor(traini$genre_ids)) )),
+source_system_tab=as.character(factor(source_system_tab,levels=levels(factor(traini$source_system_tab)) )), 
+source_screen_name=as.character(factor(source_screen_name,levels=levels(factor(traini$source_screen_name)) )),
+source_type=as.character(factor(source_type,levels=levels(factor(traini$source_type)) )),
+)   
+#eleminate rare "extra" value in test set, so that "fit new level error" is somewhat avoided
+#testi<-mutate(testi, artist_name=ifelse(is.na(artist_name)==T,"other_yep", artist_name),
+#              composer=ifelse(is.na(composer)==T,"other_compo", composer),
+#              genre_ids=ifelse(is.na(genre_ids)==T,"yep_other", genre_ids)
+#              )
+```
+
+```{r logit}
+fit_logit <- glm(
+  target ~  artist_name+composer+genre_ids+source_system_tab+ source_screen_name+ source_type , family=binomial(link="logit"), data=traini) 
+pred_lg <- predict(fit_logit, testi, type="response")
+pred_lg<- ifelse(pred_lg>0.5,1,0)
+mean(pred_lg==testi$target,na.rm=T)
+
+pred_train <- predict(fit_logit, traini, type="response")
+pred_train<- ifelse(pred_train>0.5,1,0)
+mean(pred_train==traini$target,na.rm=T)
+
+```
+```{r}
+trainif<-transmute(traini, target=factor(target),
+               source_system_tab=factor(source_system_tab),
+               source_screen_name=factor(source_screen_name),artist_name=factor(artist_name),
+               source_type=factor(source_type),genre_ids=factor(genre_ids), composer=factor(composer)
+               )
+testif<-transmute(testi, target=factor(target),     
+               source_system_tab=factor(source_system_tab,levels=levels(trainif$source_system_tab)),
+               source_screen_name=factor(source_screen_name,levels=levels(trainif$source_screen_name)),
+               source_type=factor(source_type, levels=levels(trainif$source_type)),
+               artist_name=factor(artist_name, levels=levels(trainif$artist_name)),
+               genre_ids=factor( genre_ids, levels=levels(trainif$genre_ids) ),
+               composer=factor( composer, levels=levels(trainif$composer) )
+) # make extra values to NA, in this way we can prevent "new level error" when fitting models
+```
+
+```{r random_forest}
+library(randomForest)  ##??
+fit <- randomForest(target ~ source_system_tab + source_screen_name+ source_type ,data=trainif, importance=TRUE)
+pred<-predict(fit,testif)
+mean(pred==testif$target,na.rm=T) 
+nrow(testif)
+sum(is.na(pred)==T)
+```
+
+```{r nn}
+library(nnet)
+fit_nn <- nnet(target ~ source_system_tab + source_system_tab + source_type  + genre_ids ,  data=traini,size=10)
+pred <- predict(fit_nn, as_tibble(partx$test))
+pred<-ifelse(pred>0.5,1,0)
+mean(pred==(as_tibble(partx$test))$target,na.rm=T)
+```
+-------------------
+---------------------------------------
+-----------------------------
+method2 starts here!!!!!
+```{r train_category}
+train_song_member<-mutate(train_song_member, msno_class=(factor(msno)), song_class=(factor(song_id)),art_class=(factor(artist_name)), lyric_class=(factor(lyricist)), composer_class=(factor(composer)), genre_class=(factor(genre_ids)), type_class=(factor(source_type)), system_class=(factor(source_system_tab)), screen_class=(factor(source_screen_name))  )
+
+```
+
+```{r test_numeric_category}
+testyyy<-mutate(test_song_member, msno_class=as.numeric(factor(msno, levels=levels(train_song_member$msno_class) ) ), song_class=as.numeric(factor(song_id), levels=levels(train_song_member$song_class)),art_class=as.numeric(factor(artist_name, levels=levels(train_song_member$art_class))), lyric_class=as.numeric(factor(lyricist, levels=levels(train_song_member$lyric_class))), composer_class=as.numeric(factor(composer, levels=levels(train_song_member$composer_class))), genre_class=as.numeric(factor(genre_ids, levels=levels(train_song_member$genre_class))), type_class=as.numeric(factor(source_type, levels=levels(train_song_member$type_class))), system_class=as.numeric(factor(source_system_tab, levels=levels(train_song_member$system_class))), screen_class=as.numeric(factor(source_screen_name, levels=levels(train_song_member$screen_class)))  )
+
+```
+
+```{r train_numeric}
+train_song_member<-mutate(train_song_member, msno_class=as.numeric(msno_class), song_class=as.numeric(song_class),art_class=as.numeric(art_class), lyric_class=as.numeric(lyric_class), composer_class=as.numeric(composer_class), genre_class=as.numeric(genre_class), type_class=as.numeric(type_class), system_class=as.numeric(system_class), screen_class=as.numeric(screen_class)  )
+```
+
+```{r partition}
+set.seed(10000)
+partx2<-resample_partition(train_song_member,c(train=0.6,test=0.4,k=1-0.6-0.4)) 
+#since kaggle test:train ~~1:3
+train2<-as_tibble(partx2$train)
+test2<-as_tibble(partx2$test)
+rm(partx2)
+```
+
+```{r for_kaggle}
+train2<-train_song_member
+test2<-testyyy
+```
+
+
+```{r method2}
+#note: there is originally no na in train's target
+msno_influ_train<-train2 %>% group_by(msno) %>% summarize( msno_repeat=mean(target,na.rm=T) )
+songid_influ_train<-train2 %>% group_by(song_id) %>% summarize( song_repeat=mean(target,na.rm=T) )
+artist_influ_train<-train2%>%group_by(artist_name) %>% summarize( artist_repeat=mean(target,na.rm=T) )
+compo_influ_train<-train2%>%group_by(composer) %>% summarize( compos_repeat=mean(target,na.rm=T) )
+lyri_influ_train<-train2%>%group_by(lyricist) %>% summarize( lyric_repeat=mean(target,na.rm=T) )
+genre_influ_train<-train2%>%group_by(genre_ids) %>% summarize( genre_repeat=mean(target,na.rm=T) )
+msno_art_influ_train<-train2%>%group_by(msno,artist_name) %>% summarize( msno_art_repeat=mean(target,na.rm=T) )
+system_influ_train<-train2%>%group_by(source_system_tab) %>% summarize( system_repeat=mean(target,na.rm=T) )
+screen_influ_train<-train2%>%group_by(source_screen_name) %>% summarize( screen_repeat=mean(target,na.rm=T) )
+type_influ_train<-train2%>%group_by(source_type) %>% summarize( type_repeat=mean(target,na.rm=T) )
+
+train2<-left_join(train2, songid_influ_train,by="song_id")
+train2<-left_join(train2, msno_influ_train,by="msno")
+train2<-left_join(train2, artist_influ_train,by="artist_name")
+train2<-left_join(train2, compo_influ_train,by="composer")
+train2<-left_join(train2, lyri_influ_train,by="lyricist")
+train2<-left_join(train2, genre_influ_train,by="genre_ids")
+train2<-left_join(train2, msno_art_influ_train,by=c("msno","artist_name"))
+train2<-left_join(train2, system_influ_train,by="source_system_tab")
+train2<-left_join(train2, screen_influ_train,by="source_screen_name")
+train2<-left_join(train2, type_influ_train,by="source_type")
+
+test2<-left_join(test2, songid_influ_train,by="song_id")
+test2<-left_join(test2, msno_influ_train,by="msno")
+test2<-left_join(test2, artist_influ_train,by="artist_name")
+test2<-left_join(test2, compo_influ_train,by="composer")
+test2<-left_join(test2, lyri_influ_train,by="lyricist")
+test2<-left_join(test2, genre_influ_train,by="genre_ids")
+test2<-left_join(test2, msno_art_influ_train,by=c("msno","artist_name"))
+test2<-left_join(test2, system_influ_train,by="source_system_tab")
+test2<-left_join(test2, screen_influ_train,by="source_screen_name")
+test2<-left_join(test2, type_influ_train,by="source_type")
+
+sum(is.na(test2$msno_repeat));sum(is.na(test2$song_repeat));sum(is.na(test2$artist_repeat))
+sum(is.na(test2$compos_repeat));sum(is.na(test2$lyric_repeat));sum(is.na(test2$genre_repeat));
+sum(is.na(test2$msno_art_repeat));sum(is.na(test2$system_repeat));sum(is.na(test2$screen_repeat));
+sum(is.na(test2$type_repeat));
+
+train2<-mutate(train2, source_system_tab=ifelse(is.na(source_system_tab)==T,"na_system",source_system_tab),
+source_screen_name=ifelse(is.na(source_screen_name)==T,"na_screen",source_screen_name),
+source_type=ifelse(is.na(source_type)==T,"na_type",source_type)  ) 
+# delete na for randomforest
+
+train2<-mutate(train2,source_system_tab=factor(source_system_tab), 
+               source_screen_name=factor(source_screen_name),
+               source_type=factor(source_type))
+
+test2<-mutate(test2, source_system_tab=ifelse(is.na(source_system_tab)==T,"na_system",source_system_tab),
+source_screen_name=ifelse(is.na(source_screen_name)==T,"na_screen",source_screen_name),
+source_type=ifelse(is.na(source_type)==T,"na_type",source_type)  ) #predict more, including na
+
+test2<-mutate(test2, song_repeat=ifelse(is.na(song_repeat)==T,0.5,song_repeat),
+       msno_repeat=ifelse(is.na(msno_repeat)==T,0.5,msno_repeat),
+       artist_repeat=ifelse(is.na(artist_repeat)==T,0.5,artist_repeat),
+       compos_repeat=ifelse(is.na(compos_repeat)==T,0.5,compos_repeat),
+       lyric_repeat=ifelse(is.na(lyric_repeat)==T,0.5,lyric_repeat),
+       genre_repeat=ifelse(is.na(genre_repeat)==T,0.5,genre_repeat),
+       msno_art_repeat=ifelse(is.na(msno_art_repeat)==T,0.5,msno_art_repeat),
+       system_repeat=ifelse(is.na(system_repeat)==T,0.5,system_repeat),
+       screen_repeat=ifelse(is.na(screen_repeat)==T,0.5,screen_repeat),
+       type_repeat=ifelse(is.na(type_repeat)==T,0.5,type_repeat),
+       source_system_tab=factor(source_system_tab,levels=levels(train2$source_system_tab) ),
+      source_screen_name=factor(source_screen_name,levels=levels(train2$source_screen_name) ),
+       source_type=factor(source_type,levels=levels(train2$source_type) ))
+```
+
+```{r}
+library(corrplot)
+M<-cor(select(train2,msno_repeat, song_repeat, msno_art_repeat, lyric_repeat, artist_repeat,
+              compos_repeat,genre_repeat,type_repeat, screen_repeat, system_repeat,bd,song_length,registration_init_time, expiration_date, target))
+corrplot(M,method = "circle")
+corrplot(M, method = "number")#conclusion: only source_type is enough to repressent 3 sources,
+```
+#msno_repeat, song_repeat, msno_art_repeat, lyric_repeat, artist_repeat,0.650556
+#compos_repeat,genre_repeat,type_repeat, screen_repeat, system_repeat, source_system_tab, source_screen_name,source_type  0.3 corr is big enough   use: msno_repeat+song_repeat+type_repeat
+#10 min logi with 0.8 data , maybe type_repeat is enough   0.1data type_repeat+msno_art_repeat: 0.6513105
+```{r logi2} 
+fit_logit <- glm(
+  target ~ msno_repeat+song_repeat+type_repeat , family=binomial(link="logit"), data=train2) #when 0.1 data, system+0.04, 
+pred_lg <- predict(fit_logit, test2, type="response")  #deleted some predictoes,
+
+```
+
+sum(is.na(pred_lg))
+pred_lg<- ifelse(pred_lg>0.5,1,0)
+mean(pred_lg==test2$target,na.rm=T)
+
+```{r nn}
+library(nnet)# 0.1 can get result, worth trying,
+fit_nn <- nnet(factor(target) ~ song_repeat+msno_repeat+source_system_tab+ source_screen_name+ source_type,size=5,data=train2)  #size 5 optimized? 
+pred <- predict(fit_nn, test2,type="class")
+sum(is.na(pred)==T)
+mean(as.character(pred)==as.character(test2$target),na.rm=T)
+```
+
+```{r svm}
+library(e1071)  #not so good result
+fit_svm <- svm(factor(target) ~ song_repeat+msno_repeat+artist_repeat+compos_repeat+lyric_repeat+genre_repeat+source_system_tab+ source_screen_name+ source_type,data=train2) 
+pred <- predict(fit_svm, test2,type="class")
+sum(is.na(pred)==T)
+mean(as.character(pred)==as.character(test2$target),na.rm=T)
+```
+
+```{r randomforest}
+library(randomForest)  ##??0.01, 3min   tree:100 enough?according to previous plot
+set.seed(1)
+fit <- randomForest(factor(target) ~  song_repeat+msno_repeat+artist_repeat+compos_repeat+lyric_repeat+genre_repeat+source_system_tab+ source_screen_name+ source_type ,data=train2, importance=TRUE,ntree=150) 
+#ntree=200 is better but may not run
+pred<-predict(fit,test2)
+
+mean(as.character(pred)==as.character(test2$target),na.rm=T)
+sum(is.na(pred)==T)
+varImpPlot(fit)
+plot(fit)
+```
+
+```{r combinerandomforest}
+library(randomForest)  ##??0.01, 3min   tree:100 enough?according to previous plot
+set.seed(1)
+fit1<- randomForest(factor(target) ~  song_repeat+msno_repeat+artist_repeat+compos_repeat+lyric_repeat+genre_repeat+source_system_tab+ source_screen_name+ source_type ,data=train2[1:2459139,], norm.votes=FALSE, do.trace=10,importance=TRUE,ntree=80)
+set.seed(1)
+fit2<- randomForest(factor(target) ~  song_repeat+msno_repeat+artist_repeat+compos_repeat+lyric_repeat+genre_repeat+source_system_tab+ source_screen_name+ source_type ,data=train2[2459140:(2459140+2459138),],norm.votes=FALSE, do.trace=10, importance=TRUE,ntree=80)
+set.seed(1)
+fit3<- randomForest(factor(target) ~  song_repeat+msno_repeat+artist_repeat+compos_repeat+lyric_repeat+genre_repeat+source_system_tab+ source_screen_name+ source_type ,data=train2[(2459140+2459139):(2459140+2459139+2459138),],norm.votes=FALSE, do.trace=10, importance=TRUE,ntree=80)
+rfcombined <- combine(fit1,fit2,fit3)#ntree=200 is better but may not run
+```
+
+```{r}
+pred<-predict(rfcombined,test2,type="response")
+mean(as.character(pred)==as.character(test2$target),na.rm=T)
+sum(is.na(pred)==T)
+varImpPlot(rfcombined)
+plot(rfcombined)
+```
+
+```{r}
+pred_prob<-predict(rfcombined,test2,type="prob")
+pred_prob<-as.numeric(pred_prob[,2])
+#pred_prob<-ifelse(pred_prob>0.5,1,0)
+```
+
+-----------
+
+```{r}
+fit_logit <- glm(
+  target ~  song_repeat+msno_repeat+source_system_tab+ source_screen_name+ source_type+artist_repeat+compos_repeat+lyric_repeat+genre_repeat, family=binomial(link="logit"), data=train2) 
+pred_prob <- predict(fit_logit, test2, type="response")  #may need delete extra predictor
+```
+
+```{r}
+sum(is.na(pred_prob))
+pred_prob<-ifelse(is.na(pred_prob)==T,0.5,pred_prob)
+a<-tibble(id=test3$id, target=pred_prob)
+write_csv(a,"/Users/yzh/Desktop/R data/music2/submission lgbm coolthen13.csv")
+```
+```{r data_process_again}
+train3<-mutate(train2, genre_ids=ifelse(is.na(genre_ids)==T,"na_genreid",genre_ids), artist_name=ifelse(is.na(artist_name)==T,"na_artist_name",artist_name),
+lyricist=ifelse(is.na(lyricist)==T,"na_lyric_name",lyricist),
+composer=ifelse(is.na(composer)==T,"na_composer_name",composer), msno=ifelse(is.na(msno)==T,"na_msno_ha",msno),song_id=ifelse(is.na(song_id)==T,"na_song_ha",song_id))
+
+test3<-mutate(test2, genre_ids=ifelse(is.na(genre_ids)==T,"na_genreid",genre_ids), artist_name=ifelse(is.na(artist_name)==T,"na_artist_name",artist_name),
+lyricist=ifelse(is.na(lyricist)==T,"na_lyric_name",lyricist),composer=ifelse(is.na(composer)==T,"na_composer_name",composer), msno=ifelse(is.na(msno)==T,"na_msno_ha",msno),song_id=ifelse(is.na(song_id)==T,"na_song_ha",song_id) )
+
+train3<-mutate(train3, genre_ids=factor(genre_ids), artist_name=factor(artist_name), lyricist=factor(lyricist),composer=factor(composer), msno=factor(msno), song_id=factor(song_id))
+
+test3<-mutate(test3, genre_ids=factor(genre_ids,levels=levels(train3$genre_ids)),lyricist=factor(lyricist,levels=levels(train3$lyricist)), composer=factor(composer,levels=levels(train3$composer)),msno=factor(msno,levels=levels(train3$msno)), song_id=factor(song_id,levels=levels(train3$song_id)))
+```
+
+#msno_repeat, song_repeat, msno_art_repeat, lyric_repeat, artist_repeat
+#compos_repeat,genre_repeat,type_repeat, screen_repeat, system_repeat, source_system_tab, source_screen_name,source_type    
+```{r lgbm}
+Sys.time()
+library(beepr)
+library(lightgbm)
+train_lgbm<-transmute(train3,genre_repeat,artist_repeat,msno_repeat,song_id=as.numeric(song_id),msno=as.numeric(msno), source_type=as.numeric(source_type),source_screen_name=as.numeric(source_screen_name),genre_ids=as.numeric(genre_ids),lyricist=as.numeric(lyricist),composer=as.numeric(composer),target)
+test_lgbm<-transmute(test3,genre_repeat,artist_repeat,msno_repeat,song_id=as.numeric(song_id),msno=as.numeric(msno),source_type=as.numeric(source_type),source_screen_name=as.numeric(source_screen_name),genre_ids=as.numeric(genre_ids),lyricist=as.numeric(lyricist),composer=as.numeric(composer),target)
+set.seed(1)
+valid<- as_tibble(resample_partition(test_lgbm,c(valid=0.5,testset=0.5))$valid)
+set.seed(1)
+testset<- as_tibble(resample_partition(test_lgbm,c(valid=0.5,testset=0.5))$testset)
+lgbtrain <-lgb.Dataset(as.matrix(train_lgbm[, colnames(train_lgbm) != "target"]), label = train_lgbm$target)
+params_lgb<-list(objective="binary", metric="auc")
+model_lgb<-lgb.train(params =      params_lgb,data=lgbtrain,categorical_feature=c("source_type","source_screen_name","genre_ids","lyricist",
+             "msno","composer","song_id"),
+nrounds=1000,max_bin=500,
+num_leaves=1000,learning_rate=0.5)#  nrounds: default 10 num_iterations(nrounds) make too slow
+#num_leaves has big impact, too big num_leaves may lead overfitting?? max_depth deals overfit nicely ;) 30 enough?
+Sys.time()
+beep(6)
+#train_prob<-predict(model_lgb, data = as.matrix(train_lgbm[, colnames(train_lgbm) != "target"]),model_lgb$best_iter)
+
+pred_valid<-predict(model_lgb, data = as.matrix(valid[,colnames(valid) != "target"]),model_lgb$best_iter)
+sum(is.na(pred_valid))
+pred_valid<-ifelse(is.na(pred_valid)==T,0.5,pred_valid)
+Sys.time()
+beep(6)
+#pred_test<-predict(model_lgb, data = as.matrix(testset[,colnames(testset)!="target"]),model_lgb$best_iter)
+#pred_test<-ifelse(is.na(pred_test)==T,0.5,pred_test)
+Sys.time()
+library(pROC)
+roc((valid$target), round(pred_valid,3))
+pred_valid<-ifelse(pred_valid>0.5,1,0)
+mean(pred_valid==valid$target,is.na=T)
+
+# train_prob<-ifelse(is.na(train_prob)==T,0.5,train_prob)
+# roc((train3$target), round(train_prob,2))
+# train_prob<-ifelse(train_prob>0.5,1,0)
+# mean(train_prob==train3$target,is.na=T)
+# 
+# roc((testset$target), round(pred_test,3))
+# pred_test<-ifelse(pred_test>0.5,1,0)
+# mean(pred_test==testset$target,is.na=T)
+
+
+#lgb_feature_imp<-lgb.importance(model_lgb, percentage = TRUE)
+```
+
+```{r submit_lgbm}
+Sys.time()
+library(lightgbm)
+train_lgbm<-transmute(train3,genre_repeat,artist_repeat,msno_repeat,song_id=as.numeric(song_id),msno=as.numeric(msno), source_type=as.numeric(source_type),source_screen_name=as.numeric(source_screen_name),genre_ids=as.numeric(genre_ids),lyricist=as.numeric(lyricist),composer=as.numeric(composer),target)
+rm(train3)
+test_lgbm<-transmute(test3,genre_repeat,artist_repeat,msno_repeat,song_id=as.numeric(song_id),msno=as.numeric(msno),source_type=as.numeric(source_type),source_screen_name=as.numeric(source_screen_name),genre_ids=as.numeric(genre_ids),lyricist=as.numeric(lyricist),composer=as.numeric(composer))
+
+lgbtrain <-lgb.Dataset(as.matrix(train_lgbm[, colnames(train_lgbm) != "target"]), label = train_lgbm$target)
+params_lgb<-list(objective="binary", metric="auc")
+model_lgb<-lgb.train(params =      params_lgb,data=lgbtrain,categorical_feature=c("source_type","source_screen_name","genre_ids","lyricist",
+             "msno","composer","song_id"),
+num_leaves=80,nrounds=2000,max_bin=1000,
+learning_rate=0.1)#max_bin:leave default  nrounds: bigger for accuracy,default 10
+system("say Just finished the task !")
+Sys.time()
+pred_prob<-predict(model_lgb, data = as.matrix(test_lgbm[,]),model_lgb$best_iter)
+sum(is.na(pred_prob))
+pred_prob<-ifelse(is.na(pred_prob)==T,0.5,pred_prob)
+system("say Just finished the task !")
+Sys.time()
+```
+
+ View(group_by(train_song_member, genre_ids) %>% summarize(n()) )
+
