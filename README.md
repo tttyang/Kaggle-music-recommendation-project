@@ -5,4 +5,4 @@ Here are personal python and R codes for the project.
  Feature_engineer.ipynb is similiar to submit.ipynb, except that feature_engineer.ipynb is for doing cross-validation.
  R codes(.Rmd) are mainly for exploratory data analysis and trying different machine learning models, 
  such as neutral networks, logistic regression and random forest, finally picking LightGBM.
- Some Rmarkdown chunks may need to be run in a different specific order to work properly.
+ Some Rmarkdown chunks may need to be run in a different specific order to work properly. end x
